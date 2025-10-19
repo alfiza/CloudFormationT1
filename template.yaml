@@ -1,173 +1,168 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Parameters:
-  LambdaFunctionName:
-    Type: String
-    Default: MyRestApiFunction
-  ApiName:
-    Type: String
-    Default: MyRestApi
-  StageName:
-    Type: String
-    Default: v1
-    Description: Name of API stage
+Description: CloudFormation with Lambda function for Database DynamoDB and API gateway for Student Result data.
 
 Resources:
-  Api:
-    Type: AWS::ApiGateway::RestApi
+
+  # S3bucket to store Lambda get/post files
+  LambdaCodeBucket:
+    Type: AWS::S3::Bucket
     Properties:
-      Name: ReqValidatorsSample
+      BucketName: student-lambda-code-bucket
+      AccessControl: Private
 
-  RequestBodyModelId:
-    Type: AWS::ApiGateway::Model
+  # DynamoDB Table to store student results
+  StudentResultsTable:
+    Type: AWS::DynamoDB::Table
     Properties:
-      RestApiId: !Ref Api
-      ContentType: application/json
-      Description: Request body model for Pet ID
-      Schema:
-        $schema: 'http://json-schema.org/draft-04/schema#'
-        title: RequestBodyModelId
-        properties:
-          id:
-            type: integer
+      TableName: Results
+      AttributeDefinitions:
+        - AttributeName: name
+          AttributeType: S
+      KeySchema:
+        - AttributeName: name
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST 
 
-  RequestBodyModel:
-    Type: AWS::ApiGateway::Model
-    Properties:
-      RestApiId: !Ref Api
-      ContentType: application/json
-      Description: Request body model for Pet (type, name, price, id)
-      Schema:
-        $schema: 'http://json-schema.org/draft-04/schema#'
-        title: RequestBodyModel
-        required:
-          - price
-          - name
-          - type
-        type: object
-        properties:
-          id:
-            "$ref": !Sub
-              - 'https://apigateway.amazonaws.com/restapis/${Api}/models/${RequestBodyModelId}'
-              - Api: !Ref Api
-                RequestBodyModelId: !Ref RequestBodyModelId
-          price:
-            type: number
-            minimum: 25
-            maximum: 500
-          name:
-            type: string
-          type:
-            type: string
-            enum:
-              - dog
-              - cat
-              - fish
-
-  GETValidator:
-    Type: AWS::ApiGateway::RequestValidator
-    Properties:
-      Name: params-only
-      RestApiId: !Ref Api
-      ValidateRequestBody: False
-      ValidateRequestParameters: True
-
-  POSTValidator:
-    Type: AWS::ApiGateway::RequestValidator
-    Properties:
-      Name: body-only
-      RestApiId: !Ref Api
-      ValidateRequestBody: True
-      ValidateRequestParameters: False
-
-  ValidationResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref Api
-      ParentId: !GetAtt Api.RootResourceId
-      PathPart: validation
-
-  ValidationMethodGet:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref Api
-      ResourceId: !Ref ValidationResource
-      HttpMethod: GET
-      AuthorizationType: NONE
-      RequestValidatorId: !Ref GETValidator
-      RequestParameters:
-        method.request.querystring.q1: true
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub > arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MyLambdaFunction.Arn}/invocations
-
-  ValidationMethodPost:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref Api
-      ResourceId: !Ref ValidationResource
-      HttpMethod: POST
-      AuthorizationType: NONE
-      RequestValidatorId: !Ref POSTValidator
-      RequestModels:
-        application/json: !Ref RequestBodyModel
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub > arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MyLambdaFunction.Arn}/invocations
-
-
-  #----Lambda code starts----
-
-  MyLambdaExecutionRole:
+  # IAM Role - Lambda functions
+  LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+      AssumeRolePolicyDocument:  
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
 
-  MyLambdaFunction:
+
+  # Lambda Function to Store Result
+  StoreStudentLambda:
     Type: AWS::Lambda::Function
     Properties:
-      Handler: handler.lambda_handler
+      FunctionName: StoreStudentResult
+      Handler: StoreResult.handler
       Runtime: python3.9
-      Role: !GetAtt MyLambdaExecutionRole.Arn
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: lambda-bucket-task-t1        # Replace with real bucket name
-        S3Key: lambda-code.zip       # Replace with your zip file key
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: lambda/StoreResult.zip
       Timeout: 10
-      MemorySize: 128
 
-  ApiGatewayInvokePermission:
+
+  # Lambda Function to Get Student Result
+
+  GetStudentLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: GetStudentResult
+      Handler: GetResult.handler
+      Runtime: python3.9
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: lambda/GetResult.zip
+      Timeout: 10
+
+
+  # API Gateway — Create REST API
+
+  StudentApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: StudentResultApi
+
+
+  # API Resource /store
+
+  StudentApiResourceStore:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref StudentApi
+      ParentId: !GetAtt StudentApi.RootResourceId
+      PathPart: store
+
+
+  # API Resource /get
+
+  StudentApiResourceGet:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref StudentApi
+      ParentId: !GetAtt StudentApi.RootResourceId
+      PathPart: get
+
+
+  # POST Method /store
+
+  StoreApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref StudentApi
+      ResourceId: !Ref StudentApiResourceStore
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: 
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${StoreStudentLambda.Arn}/invocations
+
+
+  # GET
+  GetApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref StudentApi
+      ResourceId: !Ref StudentApiResourceGet
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: 
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetStudentLambda.Arn}/invocations
+
+
+  # Lambda Permissions for API Gateway
+  StoreLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !Ref MyLambdaFunction
+      FunctionName: !Ref StoreStudentLambda
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub
-        arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*/validation
-  
-  #----Lambda code ends----
-  ApiDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn:
-      - ValidationMethodGet
-      - ValidationMethodPost
-      - MyLambdaFunction
+      SourceArn: 
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${StudentApi}/*/POST/store
+
+  GetLambdaPermission:
+    Type: AWS::Lambda::Permission
     Properties:
-      RestApiId: !Ref Api
-      StageName: !Sub '${StageName}'
+      FunctionName: !Ref GetStudentLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: 
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${StudentApi}/*/GET/get
+
+
+  # Deploy API Gateway Stage
+
+  StudentApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: [StoreApiMethod, GetApiMethod] 
+    Properties:
+      RestApiId: !Ref StudentApi
+      StageName: prod
 
 Outputs:
-  ApiRootUrl:
-    Description: Root Url of the API
-    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${StageName}'
-    
+  ApiUrlStore:
+    Description: URL to store student result
+    Value: 
+      Fn::Sub: https://${StudentApi}.execute-api.${AWS::Region}.amazonaws.com/prod/store
+
+  ApiUrlGet:
+    Description: URL to get student result
+    Value: 
+      Fn::Sub: https://${StudentApi}.execute-api.${AWS::Region}.amazonaws.com/prod/get

@@ -4,7 +4,7 @@ import boto3  #for Python to to access DynamoDB
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table('Result') 
 
-def lambda_handler(event, context):
+def handler(event, context):
     
     params = event.get('queryStringParameters') or {} 
     name = params.get('name')
