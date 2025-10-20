@@ -70,6 +70,19 @@ Resources:
       Name: StudentResultApi
 
 
+  # CloudWatch Log Groups
+  StoreStudentLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/StoreStudentResult
+      RetentionInDays: 14
+
+  GetStudentLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/GetStudentResult
+      RetentionInDays: 14
+      
   # API Resource /store
 
   StudentApiResourceStore:
