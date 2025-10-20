@@ -2,14 +2,6 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: CloudFormation with Lambda function for Database DynamoDB and API gateway for Student Result data.
 
 Resources:
-
-  # S3bucket to store Lambda get/post files
-  LambdaCodeBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: student-lambda-code-bucket
-      AccessControl: Private
-
   # DynamoDB Table to store student results
   StudentResultsTable:
     Type: AWS::DynamoDB::Table
@@ -23,21 +15,23 @@ Resources:
           KeyType: HASH
       BillingMode: PAY_PER_REQUEST 
 
-  # IAM Role - Lambda functions
+
+  # IAM Role for Lambda functions
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      AssumeRolePolicyDocument:  
+      AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
+              Service: 
+                - lambda.amazonaws.com
+            Action: 
+              - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
-
 
   # Lambda Function to Store Result
   StoreStudentLambda:
@@ -48,7 +42,7 @@ Resources:
       Runtime: python3.9
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: studentresultstack-lambda-code-bucket-final
         S3Key: lambda/StoreResult.zip
       Timeout: 10
 
@@ -63,7 +57,7 @@ Resources:
       Runtime: python3.9
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Ref LambdaCodeBucket
+        S3Bucket: studentresultstack-lambda-code-bucket-final
         S3Key: lambda/GetResult.zip
       Timeout: 10
 

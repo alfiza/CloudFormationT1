@@ -2,7 +2,7 @@ import json   #for JSON data
 import boto3  #for Python to to access DynamoDB
 
 dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table('Result') 
+table = dynamodb.Table('Results') 
 
 def handler(event, context):
     
