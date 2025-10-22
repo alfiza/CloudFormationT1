@@ -26,5 +26,6 @@ def handler(event, context):
     # Return success message
     return {
         'statusCode': 200,
-        'body': json.dumps({'message': 'Result stored for {name}'})
+        'body': json.dumps({'message': f'Result stored for {name}'})
+        
     }
