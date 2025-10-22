@@ -15,23 +15,25 @@ def handler(event, context):
                 'statusCode': 400,
                 'body': json.dumps({'message': 'Name is missing.'})
             }
-            # get data from result table
-            response = table.get_item(Key={'name': name})
-            item = response.get('Item')
+        # get data from result table
+        response = table.get_item(Key={'name': name})
+        item = response.get('Item')
 
-            # If student detail not exsit
-            if not item:
-                return {
-                    'statusCode': 404,
-                    'body': json.dumps({'message': 'Student not found'})
-                }
-            # Return found item
+        # If student detail not exist
+        if not item:
             return {
-                'statusCode': 200,
-                'body': json.dumps(item)
+                'statusCode': 404,
+                'body': json.dumps({'message': 'Student not found'})
             }
+        # Return found item
+        return {
+            'statusCode': 200,
+            'body': json.dumps(item, default=str)
+        }
 
     except Exception as e:
-        # error
         print(f"Error: {str(e)}")
-        return {'statusCode': 500, 'body': json.dumps({'error': str(e)})}
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
+        }
