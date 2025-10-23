@@ -2,6 +2,42 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: CloudFormation with Lambda function for Database DynamoDB and API gateway for Student Result data.
 
 Resources:
+
+  #REST API
+  MyRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: StudentResultApi
+
+  #API Gateway Stage
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: prod
+      RestApiId: !Ref MyRestApi
+      DeploymentId: !Ref StudentApiDeployment
+
+  #Usage Plan
+  MyUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      UsagePlanName: MyUsagePlan
+      Description: Usage plan with method-level throttling
+      ApiStages:
+        - ApiId: !Ref MyRestApi
+          Stage: !Ref ApiStage
+          Throttle:
+            "/pets/GET":
+              RateLimit: 50
+              BurstLimit: 100
+            "/pets/POST":
+              RateLimit: 20
+              BurstLimit: 50
+      Throttle:
+        RateLimit: 100
+        BurstLimit: 200
+
+
   # DynamoDB Table to store student results
   StudentResultsTable:
     Type: AWS::DynamoDB::Table
